@@ -292,7 +292,14 @@ def admin_delete_user():
 @APP.get("/api/ping")
 def ping():
     return jsonify({"ok": True, "message": "Backend activo"})
+    
+@APP.get("/api/admin/export-users")
+def admin_export_users():
+    if not is_admin(request):
+        return jsonify({"ok": False, "message": "No autorizado"}), 401
 
+    data = load_db()
+    return jsonify({"ok": True, "users": data})
 
 if __name__ == "__main__":
     APP.run(host="0.0.0.0", port=5050, debug=False)
