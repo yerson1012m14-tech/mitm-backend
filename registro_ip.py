@@ -52,6 +52,7 @@ def load_db() -> dict[str, Any]:
 
 
 def save_db(data: dict[str, Any]) -> None:
+    DB_FILE.parent.mkdir(parents=True, exist_ok=True)
     DB_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8"
@@ -83,7 +84,10 @@ def format_remaining_delta(delta: timedelta) -> str:
 
 def format_key_time(rec: dict[str, Any]) -> str:
     plan = str(rec.get("plan", "")).lower()
+
     if plan == "permanent":
+        if str(rec.get("status", "")).lower() == "disabled" or not rec.get("active", True):
+            return "DESACTIVADA"
         return "PERMANENTE"
 
     expires_at = parse_iso(rec.get("expires_at"))
@@ -108,6 +112,10 @@ def ensure_ip_fields(rec: dict[str, Any]) -> None:
     rec.setdefault("bound_ip", None)
     rec.setdefault("bound_at", None)
     rec.setdefault("last_ip_reset_at", None)
+    rec.setdefault("first_used_at", None)
+    rec.setdefault("expires_at", None)
+    rec.setdefault("active", True)
+    rec.setdefault("status", "new")
 
 
 def key_is_usable(rec: dict[str, Any]) -> tuple[bool, str]:
@@ -118,9 +126,17 @@ def key_is_usable(rec: dict[str, Any]) -> tuple[bool, str]:
     if status == "paused":
         return False, "Key pausada"
 
+    if status == "disabled":
+        rec["active"] = False
+        return False, "Key desactivada"
+
     if plan == "permanent":
         if not active and status == "disabled":
             return False, "Key desactivada"
+
+        if status == "expired":
+            rec["status"] = "active"
+        rec["active"] = True
         return True, "OK"
 
     expires_at = parse_iso(rec.get("expires_at"))
@@ -131,13 +147,16 @@ def key_is_usable(rec: dict[str, Any]) -> tuple[bool, str]:
             rec["status"] = "expired"
             return False, "Key vencida"
         else:
-            # Si todavia le queda tiempo, la corregimos por si quedo mal
             rec["active"] = True
             if status == "expired":
                 rec["status"] = "active"
             return True, "OK"
 
-    if not active and status == "disabled":
+    # Si no tiene expiracion aun, sigue sin activar pero usable para registrar IP
+    if status == "expired":
+        rec["status"] = "new"
+    if status == "disabled":
+        rec["active"] = False
         return False, "Key desactivada"
 
     return True, "OK"
@@ -182,7 +201,12 @@ def registrar_ip():
     save_db(data)
 
     if not usable:
-        return jsonify({"ok": False, "message": msg}), 403
+        return jsonify({
+            "ok": False,
+            "message": msg,
+            "time_left": format_key_time(rec),
+            "bound_ip": rec.get("bound_ip"),
+        }), 403
 
     bound_ip = rec.get("bound_ip")
 
@@ -239,7 +263,12 @@ def reset_ip():
     save_db(data)
 
     if not usable:
-        return jsonify({"ok": False, "message": msg}), 403
+        return jsonify({
+            "ok": False,
+            "message": msg,
+            "time_left": format_key_time(rec),
+            "bound_ip": rec.get("bound_ip"),
+        }), 403
 
     last_reset = parse_iso(rec.get("last_ip_reset_at"))
     now = now_utc()
@@ -284,6 +313,7 @@ def admin_upsert_user():
     if not username or not isinstance(record, dict):
         return jsonify({"ok": False, "message": "Datos invalidos"}), 400
 
+    ensure_ip_fields(record)
     data[username] = record
     save_db(data)
 
@@ -309,10 +339,6 @@ def admin_delete_user():
     return jsonify({"ok": True, "message": "Usuario borrado"})
 
 
-@APP.get("/api/ping")
-def ping():
-    return jsonify({"ok": True, "message": "Backend activo"})
-    
 @APP.get("/api/admin/export-users")
 def admin_export_users():
     if not is_admin(request):
@@ -320,6 +346,12 @@ def admin_export_users():
 
     data = load_db()
     return jsonify({"ok": True, "users": data})
+
+
+@APP.get("/api/ping")
+def ping():
+    return jsonify({"ok": True, "message": "Backend activo"})
+
 
 if __name__ == "__main__":
     APP.run(host="0.0.0.0", port=5050, debug=False)
