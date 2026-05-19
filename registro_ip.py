@@ -179,7 +179,7 @@ def registrar_ip():
 
     usable, msg = key_is_usable(rec)
     data[username] = rec
-save_db(data)
+    save_db(data)
 
     if not usable:
         return jsonify({"ok": False, "message": msg}), 403
@@ -236,7 +236,7 @@ def reset_ip():
 
     usable, msg = key_is_usable(rec)
     data[username] = rec
-save_db(data)
+    save_db(data)
 
     if not usable:
         return jsonify({"ok": False, "message": msg}), 403
