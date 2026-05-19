@@ -152,11 +152,10 @@ def key_is_usable(rec: dict[str, Any]) -> tuple[bool, str]:
                 rec["status"] = "active"
             return True, "OK"
 
-    # Si no tiene expiracion aun, sigue sin activar pero usable para registrar IP
     if status == "expired":
         rec["status"] = "new"
-    if status == "disabled":
-        rec["active"] = False
+
+    if not active and status == "disabled":
         return False, "Key desactivada"
 
     return True, "OK"
@@ -177,6 +176,22 @@ def get_request_ip() -> str:
 def is_admin(req) -> bool:
     token = req.headers.get("X-Admin-Token", "").strip()
     return token == ADMIN_TOKEN
+
+
+def clear_ip_from_other_users(data: dict[str, Any], current_username: str, ip_value: str) -> None:
+    for username, rec in data.items():
+        if username == current_username:
+            continue
+        if not isinstance(rec, dict):
+            continue
+
+        ensure_ip_fields(rec)
+
+        if str(rec.get("bound_ip") or "").strip() == ip_value:
+            rec["bound_ip"] = None
+            rec["bound_at"] = None
+            rec["last_ip_reset_at"] = None
+            data[username] = rec
 
 
 @APP.post("/api/registrar-ip")
@@ -211,6 +226,7 @@ def registrar_ip():
     bound_ip = rec.get("bound_ip")
 
     if not bound_ip:
+        clear_ip_from_other_users(data, username, ip_value)
         rec["bound_ip"] = ip_value
         rec["bound_at"] = iso(now_utc())
         data[username] = rec
@@ -284,6 +300,7 @@ def reset_ip():
                 "bound_ip": rec.get("bound_ip"),
             }), 429
 
+    clear_ip_from_other_users(data, username, new_ip)
     rec["bound_ip"] = new_ip
     rec["bound_at"] = iso(now)
     rec["last_ip_reset_at"] = iso(now)
@@ -313,7 +330,39 @@ def admin_upsert_user():
     if not username or not isinstance(record, dict):
         return jsonify({"ok": False, "message": "Datos invalidos"}), 400
 
+    current = data.get(username, {})
+    if not isinstance(current, dict):
+        current = {}
+
+    ensure_ip_fields(current)
     ensure_ip_fields(record)
+
+    # Mantener IP del servidor si el cliente manda una version vieja sin IP
+    if current.get("bound_ip") and not record.get("bound_ip"):
+        record["bound_ip"] = current.get("bound_ip")
+        record["bound_at"] = current.get("bound_at")
+        record["last_ip_reset_at"] = current.get("last_ip_reset_at")
+
+    # Mantener activacion real del servidor si el cliente manda vacio
+    if current.get("first_used_at") and not record.get("first_used_at"):
+        record["first_used_at"] = current.get("first_used_at")
+
+    if current.get("expires_at") and not record.get("expires_at"):
+        record["expires_at"] = current.get("expires_at")
+
+    # No devolver una activa a "new" por una copia vieja
+    current_status = str(current.get("status", "")).lower()
+    record_status = str(record.get("status", "")).lower()
+    if current_status == "active" and record_status == "new":
+        record["status"] = "active"
+        record["active"] = True
+
+    # Si en servidor ya estaba vencida de verdad, mantenerla
+    current_exp = parse_iso(current.get("expires_at"))
+    if current_exp and now_utc() >= current_exp:
+        record["status"] = "expired"
+        record["active"] = False
+
     data[username] = record
     save_db(data)
 
