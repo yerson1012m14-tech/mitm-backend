@@ -111,20 +111,34 @@ def ensure_ip_fields(rec: dict[str, Any]) -> None:
 
 
 def key_is_usable(rec: dict[str, Any]) -> tuple[bool, str]:
-    if not rec.get("active", True):
-        return False, "Key desactivada"
-
+    plan = str(rec.get("plan", "")).lower()
     status = str(rec.get("status", "")).lower()
+    active = rec.get("active", True)
+
     if status == "paused":
         return False, "Key pausada"
-    if status == "expired":
-        return False, "Key vencida"
 
-    plan = str(rec.get("plan", "")).lower()
-    if plan != "permanent":
-        expires_at = parse_iso(rec.get("expires_at"))
-        if expires_at and now_utc() >= expires_at:
+    if plan == "permanent":
+        if not active and status == "disabled":
+            return False, "Key desactivada"
+        return True, "OK"
+
+    expires_at = parse_iso(rec.get("expires_at"))
+
+    if expires_at:
+        if now_utc() >= expires_at:
+            rec["active"] = False
+            rec["status"] = "expired"
             return False, "Key vencida"
+        else:
+            # Si todavia le queda tiempo, la corregimos por si quedo mal
+            rec["active"] = True
+            if status == "expired":
+                rec["status"] = "active"
+            return True, "OK"
+
+    if not active and status == "disabled":
+        return False, "Key desactivada"
 
     return True, "OK"
 
@@ -164,6 +178,9 @@ def registrar_ip():
     ensure_ip_fields(rec)
 
     usable, msg = key_is_usable(rec)
+    data[username] = rec
+save_db(data)
+
     if not usable:
         return jsonify({"ok": False, "message": msg}), 403
 
@@ -218,6 +235,9 @@ def reset_ip():
     ensure_ip_fields(rec)
 
     usable, msg = key_is_usable(rec)
+    data[username] = rec
+save_db(data)
+
     if not usable:
         return jsonify({"ok": False, "message": msg}), 403
 
