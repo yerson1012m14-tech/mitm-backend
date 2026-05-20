@@ -200,7 +200,7 @@ def registrar_ip():
     payload = request.get_json(silent=True) or {}
 
     key_value = str(payload.get("key", "")).strip()
-    ip_value = str(payload.get("ip", "")).strip() or get_request_ip()
+    ip_value = get_request_ip()
 
     if not key_value:
         return jsonify({"ok": False, "message": "Debes introducir una key."}), 400
@@ -263,7 +263,7 @@ def reset_ip():
     payload = request.get_json(silent=True) or {}
 
     key_value = str(payload.get("key", "")).strip()
-    new_ip = str(payload.get("ip", "")).strip() or get_request_ip()
+    new_ip = get_request_ip()
 
     if not key_value:
         return jsonify({"ok": False, "message": "Debes introducir una key."}), 400
@@ -338,14 +338,12 @@ def admin_upsert_user():
     ensure_ip_fields(current)
     ensure_ip_fields(record)
 
-    # Si NO estamos forzando reset de IP, protege la IP actual del servidor
     if not force_clear_ip:
         if current.get("bound_ip") and not record.get("bound_ip"):
             record["bound_ip"] = current.get("bound_ip")
             record["bound_at"] = current.get("bound_at")
             record["last_ip_reset_at"] = current.get("last_ip_reset_at")
 
-    # Si SI estamos forzando reset de IP, borra de verdad
     if force_clear_ip:
         record["bound_ip"] = None
         record["bound_at"] = None
@@ -356,6 +354,15 @@ def admin_upsert_user():
 
     if current.get("expires_at") and not record.get("expires_at"):
         record["expires_at"] = current.get("expires_at")
+
+    if current.get("password") and not record.get("password"):
+        record["password"] = current.get("password")
+
+    if current.get("plan") and not record.get("plan"):
+        record["plan"] = current.get("plan")
+
+    if current.get("created_at") and not record.get("created_at"):
+        record["created_at"] = current.get("created_at")
 
     current_status = str(current.get("status", "")).lower()
     record_status = str(record.get("status", "")).lower()
@@ -400,6 +407,14 @@ def admin_export_users():
 
     data = load_db()
     return jsonify({"ok": True, "users": data})
+
+
+@APP.get("/api/my-ip")
+def my_ip():
+    return jsonify({
+        "ok": True,
+        "ip": get_request_ip()
+    })
 
 
 @APP.get("/api/ping")
