@@ -326,6 +326,7 @@ def admin_upsert_user():
 
     username = str(payload.get("username", "")).strip()
     record = payload.get("record")
+    force_clear_ip = bool(payload.get("force_clear_ip", False))
 
     if not username or not isinstance(record, dict):
         return jsonify({"ok": False, "message": "Datos invalidos"}), 400
@@ -337,27 +338,31 @@ def admin_upsert_user():
     ensure_ip_fields(current)
     ensure_ip_fields(record)
 
-    # Mantener IP del servidor si el cliente manda una version vieja sin IP
-    if current.get("bound_ip") and not record.get("bound_ip"):
-        record["bound_ip"] = current.get("bound_ip")
-        record["bound_at"] = current.get("bound_at")
-        record["last_ip_reset_at"] = current.get("last_ip_reset_at")
+    # Si NO estamos forzando reset de IP, protege la IP actual del servidor
+    if not force_clear_ip:
+        if current.get("bound_ip") and not record.get("bound_ip"):
+            record["bound_ip"] = current.get("bound_ip")
+            record["bound_at"] = current.get("bound_at")
+            record["last_ip_reset_at"] = current.get("last_ip_reset_at")
 
-    # Mantener activacion real del servidor si el cliente manda vacio
+    # Si SI estamos forzando reset de IP, borra de verdad
+    if force_clear_ip:
+        record["bound_ip"] = None
+        record["bound_at"] = None
+        record["last_ip_reset_at"] = None
+
     if current.get("first_used_at") and not record.get("first_used_at"):
         record["first_used_at"] = current.get("first_used_at")
 
     if current.get("expires_at") and not record.get("expires_at"):
         record["expires_at"] = current.get("expires_at")
 
-    # No devolver una activa a "new" por una copia vieja
     current_status = str(current.get("status", "")).lower()
     record_status = str(record.get("status", "")).lower()
     if current_status == "active" and record_status == "new":
         record["status"] = "active"
         record["active"] = True
 
-    # Si en servidor ya estaba vencida de verdad, mantenerla
     current_exp = parse_iso(current.get("expires_at"))
     if current_exp and now_utc() >= current_exp:
         record["status"] = "expired"
