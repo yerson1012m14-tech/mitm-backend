@@ -1,16 +1,46 @@
-name: XITFORGE
+name: JASONXIT
 options:
-  bundleIdPrefix: com.apple.mobile
+  bundleIdPrefix: com.jasonxit
   deploymentTarget:
-    iOS: "14.0"
+    iOS: 15.0
+  xcodeVersion: "15.4"
+  createIntermediateGroups: true
+
 targets:
-  XITFORGE:
+  JASONXIT:
     type: application
     platform: iOS
     sources:
-      - path: MiApp
+      - path: JASONXIT
     settings:
       base:
-        INFOPLIST_FILE: MiApp/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.apple.mobile.MobileHouseArrest
+        PRODUCT_BUNDLE_IDENTIFIER: com.jasonxit.app
+        PRODUCT_NAME: JASONXIT
+        INFOPLIST_FILE: JASONXIT/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.9"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        AD_HOC_CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: ""
+        ENABLE_BITCODE: NO
+        SWIFT_OBJC_BRIDGING_HEADER: "JASONXIT/JASONXIT-Bridging-Header.h"
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+        HEADER_SEARCH_PATHS:
+          - "$(SRCROOT)/JASONXIT/**"
+          - "$(SRCROOT)/JASONXIT/kpf"
+          - "$(SRCROOT)/JASONXIT/kexploit"
+          - "$(SRCROOT)/JASONXIT/utils"
+
+schemes:
+  JASONXIT:
+    build:
+      targets:
+        JASONXIT: all
+    run:
+      config: Release
+    archive:
+      config: Release
