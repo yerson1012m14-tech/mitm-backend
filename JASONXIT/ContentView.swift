@@ -11,31 +11,19 @@ struct ContentView: View {
     @EnvironmentObject var appState: JASONXITAppState
     
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                Color(red: 0.04, green: 0.04, blue: 0.06)
-                    .ignoresSafeArea()
-
-                if appState.currentRoute == .splash {
-                    SplashView()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .transition(.opacity)
-                } else if appState.currentRoute == .keyActivation {
-                    KeyActivationView()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .transition(.opacity)
-                } else {
-                    MainAppContainerView()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .transition(.opacity)
-                }
+        ZStack {
+            Color(red: 0.04, green: 0.04, blue: 0.06).ignoresSafeArea()
+            
+            if appState.currentRoute == .splash {
+                SplashView()
+                    .transition(.opacity)
+            } else if appState.currentRoute == .keyActivation {
+                KeyActivationView()
+                    .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
+            } else {
+                MainAppContainerView()
+                    .transition(.opacity)
             }
-            .frame(width: proxy.size.width,
-                   height: proxy.size.height,
-                   alignment: .center)
         }
         .animation(.easeInOut(duration: 0.35), value: appState.currentRoute)
     }
@@ -49,9 +37,7 @@ struct SplashView: View {
     @State private var loadingProgress: CGFloat = 0.0
     
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 24) {
+        VStack(spacing: 24) {
             Spacer()
             
             // Neon Logo
@@ -101,13 +87,7 @@ struct SplashView: View {
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.gray)
             }
-                    .padding(.bottom, 40)
-                }
-                .frame(minHeight: proxy.size.height)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-            }
-            .scrollIndicators(.hidden)
+            .padding(.bottom, 40)
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
@@ -136,9 +116,7 @@ struct KeyActivationView: View {
     @State private var isSuccess = false
     
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 24) {
+        VStack(spacing: 24) {
             Spacer()
             
             // Header
@@ -231,17 +209,10 @@ struct KeyActivationView: View {
             
             Spacer()
             
-                    Text("XITFORGE v2.0 • Licencia sincronizada")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.gray.opacity(0.7))
-                        .padding(.bottom, 20)
-                }
-                .frame(minHeight: proxy.size.height)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-            }
-            .scrollIndicators(.hidden)
-            .scrollDismissesKeyboard(.interactively)
+            Text("JASON XIT v2.0 • Licencia Criptográfica Sincronizada")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.gray.opacity(0.7))
+                .padding(.bottom, 20)
         }
     }
     
