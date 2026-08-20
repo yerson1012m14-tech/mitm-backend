@@ -25,7 +25,7 @@
         [UIColor colorWithWhite:0.18 alpha:1.0];
 
     appearance.titleTextAttributes = @{
-        NSForegroundColorAttributeName: acento,
+        NSForegroundColorAttributeName: UIColor.whiteColor,
         NSFontAttributeName:
             [UIFont systemFontOfSize:17
                               weight:UIFontWeightBold]
@@ -36,11 +36,22 @@
 
     navigationBar.standardAppearance = appearance;
     navigationBar.scrollEdgeAppearance = appearance;
+    navigationBar.compactAppearance = appearance;
     navigationBar.tintColor = acento;
+
+    /*
+     IMPORTANTE:
+     Crear la ventana con UIScreen ya no es suficiente
+     en dispositivos modernos si queremos controlar
+     correctamente los límites de la aplicación.
+     */
 
     self.window =
         [[UIWindow alloc] initWithFrame:
             [UIScreen mainScreen].bounds];
+
+    self.window.backgroundColor =
+        [UIColor blackColor];
 
     KeyViewController *keyViewController =
         [[KeyViewController alloc] init];
@@ -57,6 +68,14 @@
     [self.window makeKeyAndVisible];
 
     return YES;
+}
+
+#pragma mark - Orientation
+
+- (UIInterfaceOrientationMask)application:(UIApplication *)application
+    supportedInterfaceOrientationsForWindow:(UIWindow *)window {
+
+    return UIInterfaceOrientationMaskPortrait;
 }
 
 @end
