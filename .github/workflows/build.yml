@@ -1,83 +1,58 @@
-name: Compilar XITFORGE con Motor Filza
-on: [push, workflow_dispatch]
+name: Build XITFORGE iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
-  build-my-app:
-    runs-on: macos-latest
+  build:
+    runs-on: macos-14
+
     steps:
-      - name: Clonar mi app
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias base
+      - name: Show Xcode
         run: |
-          brew install xcodegen ldid dpkg make
-          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          echo "$HOME/theos/bin" >> $GITHUB_PATH
+          xcodebuild -version
+          xcode-select -p
 
-      - name: Compilar e instalar insert_dylib
+      - name: Verify project files
         run: |
-          git clone https://github.com/Tyilo/insert_dylib.git
-          cd insert_dylib
-          clang insert_dylib/main.c -o insert_dylib_tool
-          sudo cp insert_dylib_tool /usr/local/bin/insert_dylib
-          sudo chmod +x /usr/local/bin/insert_dylib
-          cd ..
+          test -f JASONXIT.xcodeproj/project.pbxproj
+          test -f JASONXIT/Info.plist
+          echo "Project found: JASONXIT.xcodeproj"
 
-      - name: Generar proyecto Xcode con XcodeGen
-        run: xcodegen generate
-
-      - name: Clonar y compilar el motor FilzaSlop
+      - name: Build unsigned app
         run: |
-          git clone --recursive https://github.com/0xjohnnydev/FilzaSlop.git motor_filza
-          cd motor_filza
-          export SYSROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-          export TARGET=iphone:clang:latest:18.0
-          make clean
-          make package FINALPACKAGE=1
-          cd ..
-
-      - name: Compilar XITFORGE
-        run: |
-          xcodebuild clean build \
-            -project XITFORGE.xcodeproj \
-            -scheme XITFORGE \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
+          set -euo pipefail
+          rm -rf build
+          xcodebuild clean build \\
+            -project JASONXIT.xcodeproj \\
+            -scheme JASONXIT \\
+            -configuration Release \\
+            -sdk iphoneos \\
+            -destination 'generic/platform=iOS' \\
+            -derivedDataPath build \\
+            CODE_SIGNING_ALLOWED=NO \\
+            CODE_SIGNING_REQUIRED=NO \\
             CODE_SIGN_IDENTITY=""
 
-      - name: Empaquetar XITFORGE con el motor
+      - name: Package unsigned IPA
         run: |
+          set -euo pipefail
+          APP_PATH=$(find build/Build/Products -name 'JASONXIT.app' -type d | head -n 1)
+          test -d "$APP_PATH"
+          rm -rf Payload XITFORGE.ipa
           mkdir -p Payload
-          APP_PATH=$(find build -name "XITFORGE.app" -type d | head -n 1)
-          echo "App encontrada en: $APP_PATH"
-          cp -r "$APP_PATH" Payload/
-          
-          DYLIB_PATH=$(find motor_filza -name "FilzaApplySandboxExt.dylib" | head -n 1)
-          if [ -z "$DYLIB_PATH" ]; then
-            DYLIB_PATH=$(find motor_filza/.theos -name "*.dylib" | head -n 1)
-          fi
-          DYLIB_NAME=$(basename "$DYLIB_PATH")
-          echo "Motor encontrado: $DYLIB_NAME"
-          cp "$DYLIB_PATH" Payload/XITFORGE.app/
-          
-          insert_dylib --strip-codesig --all-yes "@executable_path/$DYLIB_NAME" Payload/XITFORGE.app/XITFORGE Payload/XITFORGE.app/XITFORGE_patched
-          mv Payload/XITFORGE.app/XITFORGE_patched Payload/XITFORGE.app/XITFORGE
-          
-          echo "=== Contenido del bundle ==="
-          ls -la Payload/XITFORGE.app/
-          echo "=== Load commands del binario ==="
-          otool -L Payload/XITFORGE.app/XITFORGE
-          
-          FECHA=$(date +%Y%m%d_%H%M%S)
-          zip -qr XITFORGE_${FECHA}.ipa Payload/
-          echo "IPA generado: XITFORGE_${FECHA}.ipa"
+          cp -R "$APP_PATH" Payload/JASONXIT.app
+          /usr/bin/zip -qry XITFORGE.ipa Payload
+          unzip -t XITFORGE.ipa
 
-      - name: Subir IPA final
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-App-Final
-          path: XITFORGE_*.ipa
+          name: XITFORGE-unsigned-IPA
+          path: XITFORGE.ipa
+          if-no-files-found: error
