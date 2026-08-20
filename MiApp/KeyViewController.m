@@ -257,7 +257,7 @@ static UIColor *XFAccent2(void) { return [UIColor colorWithRed:0.20 green:0.78 b
     [self.view endEditing:YES];
 }
 
-static NSString *const XITFORGE_SERVER_URL = @"http://192.168.1.100:8080";
+static NSString *const XITFORGE_SERVER_URL = @"http://10.0.0.19:8080";
 
 - (NSString *)deviceIdentifier {
     NSString *identifier = [UIDevice currentDevice].identifierForVendor.UUIDString;
