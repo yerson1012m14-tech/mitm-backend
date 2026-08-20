@@ -2,11 +2,11 @@
 #import "ViewController.h"
 
 static UIColor *XFBlack(void) {
-    return [UIColor colorWithRed:0.018 green:0.02 blue:0.025 alpha:1.0];
+    return [UIColor colorWithRed:0.018 green:0.020 blue:0.025 alpha:1.0];
 }
 
 static UIColor *XFCard(void) {
-    return [UIColor colorWithRed:0.055 green:0.06 blue:0.075 alpha:1.0];
+    return [UIColor colorWithRed:0.055 green:0.060 blue:0.075 alpha:1.0];
 }
 
 static UIColor *XFAccent(void) {
@@ -19,6 +19,7 @@ static UIColor *XFAccent2(void) {
 
 @interface KeyViewController () <UITextFieldDelegate>
 
+@property(nonatomic,strong) UIScrollView *scrollView;
 @property(nonatomic,strong) UITextField *keyField;
 @property(nonatomic,strong) UIButton *pasteButton;
 @property(nonatomic,strong) UIButton *continueButton;
@@ -35,6 +36,15 @@ static UIColor *XFAccent2(void) {
     self.view.backgroundColor = XFBlack();
 
     [self buildUI];
+
+    UITapGestureRecognizer *dismissTap =
+        [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                action:@selector(dismissKeyboard)];
+
+    dismissTap.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:dismissTap];
+
+    [self registerKeyboardNotifications];
     [self inspectClipboardSilently];
 }
 
@@ -44,32 +54,45 @@ static UIColor *XFAccent2(void) {
     [self inspectClipboardSilently];
 }
 
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 #pragma mark - UI
 
 - (void)buildUI {
 
-    UIScrollView *scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
-    scroll.translatesAutoresizingMaskIntoConstraints = NO;
-    scroll.alwaysBounceVertical = YES;
-    [self.view addSubview:scroll];
+    self.scrollView = [[UIScrollView alloc] init];
+    self.scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.scrollView.backgroundColor = XFBlack();
+    self.scrollView.alwaysBounceVertical = YES;
+    self.scrollView.showsVerticalScrollIndicator = NO;
+    self.scrollView.keyboardDismissMode =
+        UIScrollViewKeyboardDismissModeInteractive;
+    self.scrollView.contentInsetAdjustmentBehavior =
+        UIScrollViewContentInsetAdjustmentAlways;
+
+    [self.view addSubview:self.scrollView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [scroll.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [scroll.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-        [scroll.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [scroll.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
+        [self.scrollView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [self.scrollView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.scrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
     ]];
 
     UIView *content = [[UIView alloc] init];
     content.translatesAutoresizingMaskIntoConstraints = NO;
-    [scroll addSubview:content];
+
+    [self.scrollView addSubview:content];
 
     [NSLayoutConstraint activateConstraints:@[
-        [content.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor],
-        [content.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor],
-        [content.leadingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.leadingAnchor],
-        [content.trailingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.trailingAnchor],
-        [content.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor]
+        [content.topAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.topAnchor],
+        [content.bottomAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.bottomAnchor],
+        [content.leadingAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.leadingAnchor],
+        [content.trailingAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.trailingAnchor],
+        [content.widthAnchor constraintEqualToAnchor:self.scrollView.frameLayoutGuide.widthAnchor],
+        [content.heightAnchor constraintGreaterThanOrEqualToAnchor:self.scrollView.frameLayoutGuide.heightAnchor]
     ]];
 
     UIView *glow = [[UIView alloc] init];
@@ -81,6 +104,7 @@ static UIColor *XFAccent2(void) {
     glow.layer.shadowOpacity = 0.8;
     glow.layer.shadowRadius = 40.0;
     glow.layer.shadowOffset = CGSizeZero;
+
     [content addSubview:glow];
 
     UILabel *logo = [[UILabel alloc] init];
@@ -94,6 +118,7 @@ static UIColor *XFAccent2(void) {
     logo.layer.masksToBounds = YES;
     logo.layer.borderWidth = 2.0;
     logo.layer.borderColor = XFAccent().CGColor;
+
     [content addSubview:logo];
 
     UILabel *title = [[UILabel alloc] init];
@@ -102,14 +127,17 @@ static UIColor *XFAccent2(void) {
     title.textColor = UIColor.whiteColor;
     title.font = [UIFont systemFontOfSize:30 weight:UIFontWeightBlack];
     title.textAlignment = NSTextAlignmentCenter;
+
     [content addSubview:title];
 
     UILabel *subtitle = [[UILabel alloc] init];
     subtitle.translatesAutoresizingMaskIntoConstraints = NO;
     subtitle.text = @"ACCESO SEGURO";
     subtitle.textColor = XFAccent2();
-    subtitle.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightBold];
+    subtitle.font =
+        [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightBold];
     subtitle.textAlignment = NSTextAlignmentCenter;
+
     [content addSubview:subtitle];
 
     UILabel *instruction = [[UILabel alloc] init];
@@ -117,10 +145,13 @@ static UIColor *XFAccent2(void) {
     instruction.text =
         @"Copia tu Key y pégala aquí.\n"
          "Si ya está copiada, XITFORGE la detectará automáticamente.";
-    instruction.textColor = [UIColor colorWithWhite:0.68 alpha:1.0];
+    instruction.textColor =
+        [UIColor colorWithWhite:0.68 alpha:1.0];
     instruction.numberOfLines = 0;
     instruction.textAlignment = NSTextAlignmentCenter;
-    instruction.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    instruction.font =
+        [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+
     [content addSubview:instruction];
 
     UIView *card = [[UIView alloc] init];
@@ -128,14 +159,20 @@ static UIColor *XFAccent2(void) {
     card.backgroundColor = XFCard();
     card.layer.cornerRadius = 18.0;
     card.layer.borderWidth = 1.0;
-    card.layer.borderColor = [UIColor colorWithWhite:0.16 alpha:1.0].CGColor;
+    card.layer.borderColor =
+        [UIColor colorWithWhite:0.16 alpha:1.0].CGColor;
+
     [content addSubview:card];
 
     UILabel *keyLabel = [[UILabel alloc] init];
     keyLabel.translatesAutoresizingMaskIntoConstraints = NO;
     keyLabel.text = @"KEY DE ACCESO";
-    keyLabel.textColor = [UIColor colorWithWhite:0.62 alpha:1.0];
-    keyLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
+    keyLabel.textColor =
+        [UIColor colorWithWhite:0.62 alpha:1.0];
+    keyLabel.font =
+        [UIFont monospacedSystemFontOfSize:10
+                                    weight:UIFontWeightBold];
+
     [card addSubview:keyLabel];
 
     self.keyField = [[UITextField alloc] init];
@@ -144,16 +181,32 @@ static UIColor *XFAccent2(void) {
     self.keyField.placeholder = @"XXXX-XXXX-XXXX-XXXX";
     self.keyField.textColor = UIColor.whiteColor;
     self.keyField.tintColor = XFAccent2();
-    self.keyField.backgroundColor = [UIColor colorWithWhite:0.025 alpha:1.0];
+    self.keyField.backgroundColor =
+        [UIColor colorWithWhite:0.025 alpha:1.0];
     self.keyField.layer.cornerRadius = 12.0;
     self.keyField.layer.borderWidth = 1.0;
-    self.keyField.layer.borderColor = [UIColor colorWithWhite:0.14 alpha:1.0].CGColor;
-    self.keyField.font = [UIFont monospacedSystemFontOfSize:16 weight:UIFontWeightBold];
-    self.keyField.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
-    self.keyField.autocorrectionType = UITextAutocorrectionTypeNo;
-    self.keyField.clearButtonMode = UITextFieldViewModeWhileEditing;
-    self.keyField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
-    self.keyField.leftViewMode = UITextFieldViewModeAlways;
+    self.keyField.layer.borderColor =
+        [UIColor colorWithWhite:0.14 alpha:1.0].CGColor;
+    self.keyField.font =
+        [UIFont monospacedSystemFontOfSize:16
+                                    weight:UIFontWeightBold];
+
+    self.keyField.autocapitalizationType =
+        UITextAutocapitalizationTypeAllCharacters;
+
+    self.keyField.autocorrectionType =
+        UITextAutocorrectionTypeNo;
+
+    self.keyField.clearButtonMode =
+        UITextFieldViewModeWhileEditing;
+
+    self.keyField.returnKeyType = UIReturnKeyDone;
+
+    self.keyField.leftView =
+        [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
+
+    self.keyField.leftViewMode =
+        UITextFieldViewModeAlways;
 
     [self.keyField addTarget:self
                       action:@selector(keyChanged:)
@@ -161,7 +214,9 @@ static UIColor *XFAccent2(void) {
 
     [card addSubview:self.keyField];
 
-    self.pasteButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.pasteButton =
+        [UIButton buttonWithType:UIButtonTypeSystem];
+
     self.pasteButton.translatesAutoresizingMaskIntoConstraints = NO;
 
     [self.pasteButton setTitle:@"PEGAR KEY"
@@ -171,7 +226,8 @@ static UIColor *XFAccent2(void) {
                             forState:UIControlStateNormal];
 
     self.pasteButton.titleLabel.font =
-        [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightBold];
+        [UIFont monospacedSystemFontOfSize:11
+                                    weight:UIFontWeightBold];
 
     self.pasteButton.backgroundColor =
         [UIColor colorWithWhite:0.09 alpha:1.0];
@@ -184,7 +240,9 @@ static UIColor *XFAccent2(void) {
 
     [card addSubview:self.pasteButton];
 
-    self.continueButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.continueButton =
+        [UIButton buttonWithType:UIButtonTypeSystem];
+
     self.continueButton.translatesAutoresizingMaskIntoConstraints = NO;
 
     [self.continueButton setTitle:@"VERIFICAR Y ENTRAR"
@@ -194,12 +252,15 @@ static UIColor *XFAccent2(void) {
                                forState:UIControlStateNormal];
 
     self.continueButton.titleLabel.font =
-        [UIFont systemFontOfSize:15 weight:UIFontWeightBlack];
+        [UIFont systemFontOfSize:15
+                          weight:UIFontWeightBlack];
 
     self.continueButton.backgroundColor = XFAccent();
     self.continueButton.layer.cornerRadius = 14.0;
 
-    self.continueButton.layer.shadowColor = XFAccent().CGColor;
+    self.continueButton.layer.shadowColor =
+        XFAccent().CGColor;
+
     self.continueButton.layer.shadowOpacity = 0.35;
     self.continueButton.layer.shadowRadius = 14.0;
     self.continueButton.layer.shadowOffset = CGSizeZero;
@@ -213,9 +274,13 @@ static UIColor *XFAccent2(void) {
     self.statusLabel = [[UILabel alloc] init];
     self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.statusLabel.text = @"Listo para verificar";
-    self.statusLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
+    self.statusLabel.textColor =
+        [UIColor colorWithWhite:0.55 alpha:1.0];
+
     self.statusLabel.font =
-        [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
+        [UIFont monospacedSystemFontOfSize:11
+                                    weight:UIFontWeightRegular];
+
     self.statusLabel.textAlignment = NSTextAlignmentCenter;
     self.statusLabel.numberOfLines = 2;
 
@@ -234,115 +299,248 @@ static UIColor *XFAccent2(void) {
     UILabel *footer = [[UILabel alloc] init];
     footer.translatesAutoresizingMaskIntoConstraints = NO;
     footer.text = @"XITFORGE • ACCESO MULTIUSUARIO";
-    footer.textColor = [UIColor colorWithWhite:0.36 alpha:1.0];
+    footer.textColor =
+        [UIColor colorWithWhite:0.36 alpha:1.0];
+
     footer.font =
-        [UIFont monospacedSystemFontOfSize:9 weight:UIFontWeightSemibold];
+        [UIFont monospacedSystemFontOfSize:9
+                                    weight:UIFontWeightSemibold];
+
     footer.textAlignment = NSTextAlignmentCenter;
 
     [content addSubview:footer];
 
     [NSLayoutConstraint activateConstraints:@[
 
-        [glow.topAnchor constraintEqualToAnchor:content.topAnchor constant:30],
+        [glow.topAnchor constraintEqualToAnchor:content.topAnchor constant:20.0],
         [glow.centerXAnchor constraintEqualToAnchor:content.centerXAnchor],
-        [glow.widthAnchor constraintEqualToConstant:190],
-        [glow.heightAnchor constraintEqualToConstant:190],
+        [glow.widthAnchor constraintEqualToConstant:190.0],
+        [glow.heightAnchor constraintEqualToConstant:190.0],
 
-        [logo.topAnchor constraintEqualToAnchor:content.topAnchor constant:42],
+        [logo.topAnchor constraintEqualToAnchor:content.topAnchor constant:32.0],
         [logo.centerXAnchor constraintEqualToAnchor:content.centerXAnchor],
-        [logo.widthAnchor constraintEqualToConstant:76],
-        [logo.heightAnchor constraintEqualToConstant:76],
+        [logo.widthAnchor constraintEqualToConstant:76.0],
+        [logo.heightAnchor constraintEqualToConstant:76.0],
 
-        [title.topAnchor constraintEqualToAnchor:logo.bottomAnchor constant:18],
-        [title.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:24],
-        [title.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-24],
+        [title.topAnchor constraintEqualToAnchor:logo.bottomAnchor constant:18.0],
+        [title.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:24.0],
+        [title.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-24.0],
 
-        [subtitle.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:4],
+        [subtitle.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:4.0],
         [subtitle.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
         [subtitle.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
 
-        [instruction.topAnchor constraintEqualToAnchor:subtitle.bottomAnchor constant:18],
-        [instruction.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:32],
-        [instruction.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-32],
+        [instruction.topAnchor constraintEqualToAnchor:subtitle.bottomAnchor constant:18.0],
+        [instruction.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:32.0],
+        [instruction.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-32.0],
 
-        [card.topAnchor constraintEqualToAnchor:instruction.bottomAnchor constant:24],
-        [card.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20],
-        [card.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20],
-        [card.heightAnchor constraintEqualToConstant:164],
+        [card.topAnchor constraintEqualToAnchor:instruction.bottomAnchor constant:24.0],
+        [card.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20.0],
+        [card.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20.0],
+        [card.heightAnchor constraintEqualToConstant:164.0],
 
-        [keyLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:18],
-        [keyLabel.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
+        [keyLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:18.0],
+        [keyLabel.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16.0],
+        [keyLabel.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor constant:-16.0],
 
-        [self.keyField.topAnchor constraintEqualToAnchor:keyLabel.bottomAnchor constant:10],
-        [self.keyField.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
-        [self.keyField.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
-        [self.keyField.heightAnchor constraintEqualToConstant:48],
+        [self.keyField.topAnchor constraintEqualToAnchor:keyLabel.bottomAnchor constant:10.0],
+        [self.keyField.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16.0],
+        [self.keyField.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16.0],
+        [self.keyField.heightAnchor constraintEqualToConstant:48.0],
 
-        [self.pasteButton.topAnchor constraintEqualToAnchor:self.keyField.bottomAnchor constant:10],
-        [self.pasteButton.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
-        [self.pasteButton.widthAnchor constraintEqualToConstant:120],
-        [self.pasteButton.heightAnchor constraintEqualToConstant:32],
+        [self.pasteButton.topAnchor constraintEqualToAnchor:self.keyField.bottomAnchor constant:10.0],
+        [self.pasteButton.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16.0],
+        [self.pasteButton.widthAnchor constraintEqualToConstant:120.0],
+        [self.pasteButton.heightAnchor constraintEqualToConstant:32.0],
 
-        [self.continueButton.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:20],
-        [self.continueButton.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20],
-        [self.continueButton.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20],
-        [self.continueButton.heightAnchor constraintEqualToConstant:54],
+        [self.continueButton.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:20.0],
+        [self.continueButton.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20.0],
+        [self.continueButton.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20.0],
+        [self.continueButton.heightAnchor constraintEqualToConstant:54.0],
 
         [self.spinner.centerYAnchor constraintEqualToAnchor:self.continueButton.centerYAnchor],
-        [self.spinner.trailingAnchor constraintEqualToAnchor:self.continueButton.trailingAnchor constant:-16],
+        [self.spinner.trailingAnchor constraintEqualToAnchor:self.continueButton.trailingAnchor constant:-16.0],
 
-        [self.statusLabel.topAnchor constraintEqualToAnchor:self.continueButton.bottomAnchor constant:14],
-        [self.statusLabel.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:30],
-        [self.statusLabel.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-30],
+        [self.statusLabel.topAnchor constraintEqualToAnchor:self.continueButton.bottomAnchor constant:14.0],
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:30.0],
+        [self.statusLabel.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-30.0],
 
-        [footer.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor constant:28],
-        [footer.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20],
-        [footer.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20],
-        [footer.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-30]
+        [footer.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor constant:28.0],
+        [footer.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:20.0],
+        [footer.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20.0],
+        [footer.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-30.0]
     ]];
+}
+
+#pragma mark - Keyboard
+
+- (void)registerKeyboardNotifications {
+
+    NSNotificationCenter *center =
+        [NSNotificationCenter defaultCenter];
+
+    [center addObserver:self
+               selector:@selector(keyboardWillChangeFrame:)
+                   name:UIKeyboardWillChangeFrameNotification
+                 object:nil];
+
+    [center addObserver:self
+               selector:@selector(keyboardWillHide:)
+                   name:UIKeyboardWillHideNotification
+                 object:nil];
+}
+
+- (void)keyboardWillChangeFrame:(NSNotification *)notification {
+
+    NSDictionary *info = notification.userInfo;
+
+    NSValue *frameValue =
+        info[UIKeyboardFrameEndUserInfoKey];
+
+    NSTimeInterval duration =
+        [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+
+    UIViewAnimationCurve curve =
+        [info[UIKeyboardAnimationCurveUserInfoKey] integerValue];
+
+    if (!frameValue) {
+        return;
+    }
+
+    CGRect keyboardFrameScreen =
+        [frameValue CGRectValue];
+
+    CGRect keyboardFrame =
+        [self.view convertRect:keyboardFrameScreen fromView:nil];
+
+    CGFloat overlap =
+        MAX(0.0,
+            CGRectGetMaxY(self.view.bounds) -
+            CGRectGetMinY(keyboardFrame));
+
+    CGFloat bottomInset =
+        overlap > 0.0 ? overlap + 16.0 : 0.0;
+
+    UIEdgeInsets insets =
+        self.scrollView.contentInset;
+
+    insets.bottom = bottomInset;
+
+    UIEdgeInsets indicatorInsets =
+        self.scrollView.scrollIndicatorInsets;
+
+    indicatorInsets.bottom = bottomInset;
+
+    [UIView beginAnimations:nil context:nil];
+    [UIView setAnimationDuration:duration];
+    [UIView setAnimationCurve:curve];
+
+    self.scrollView.contentInset = insets;
+    self.scrollView.scrollIndicatorInsets = indicatorInsets;
+
+    [UIView commitAnimations];
+
+    [self ensureKeyFieldVisible];
+}
+
+- (void)keyboardWillHide:(NSNotification *)notification {
+
+    NSDictionary *info = notification.userInfo;
+
+    NSTimeInterval duration =
+        [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+
+    UIEdgeInsets insets =
+        self.scrollView.contentInset;
+
+    insets.bottom = 0.0;
+
+    UIEdgeInsets indicatorInsets =
+        self.scrollView.scrollIndicatorInsets;
+
+    indicatorInsets.bottom = 0.0;
+
+    [UIView animateWithDuration:duration animations:^{
+        self.scrollView.contentInset = insets;
+        self.scrollView.scrollIndicatorInsets = indicatorInsets;
+    }];
+}
+
+- (void)ensureKeyFieldVisible {
+
+    if (!self.keyField.isFirstResponder) {
+        return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CGRect rect =
+            [self.scrollView convertRect:self.keyField.bounds
+                                  fromView:self.keyField];
+
+        rect = CGRectInset(rect, 0.0, -30.0);
+
+        [self.scrollView scrollRectToVisible:rect
+                                    animated:YES];
+    });
+}
+
+- (void)dismissKeyboard {
+
+    [self.view endEditing:YES];
 }
 
 #pragma mark - Key Formatting
 
-- (NSString *)normalizedKeyFromString:(NSString *)input {
+- (NSString *)formattedKeyFromString:(NSString *)input {
 
-    if (input == nil) {
+    if (!input) {
         return @"";
     }
 
     NSString *clean =
         [input stringByTrimmingCharactersInSet:
-                   [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                  [NSCharacterSet whitespaceAndNewlineCharacterSet]];
 
     clean = [clean uppercaseString];
-    clean = [[clean componentsSeparatedByString:@"-"] componentsJoinedByString:@""];
 
-    NSMutableString *allowed = [NSMutableString string];
+    clean = [[clean componentsSeparatedByString:@"-"]
+             componentsJoinedByString:@""];
 
-    for (NSUInteger i = 0; i < clean.length && allowed.length < 16; i++) {
+    NSMutableString *allowed =
+        [NSMutableString string];
 
-        unichar ch = [clean characterAtIndex:i];
+    for (NSUInteger i = 0;
+         i < clean.length && allowed.length < 16;
+         i++) {
+
+        unichar ch =
+            [clean characterAtIndex:i];
 
         BOOL isLetter =
             ((ch >= 'A' && ch <= 'Z') ||
              (ch >= 'a' && ch <= 'z'));
 
-        BOOL isNumber = (ch >= '0' && ch <= '9');
+        BOOL isNumber =
+            (ch >= '0' && ch <= '9');
 
         if (isLetter || isNumber) {
             [allowed appendFormat:@"%C", ch];
         }
     }
 
-    NSMutableString *formatted = [NSMutableString string];
+    NSMutableString *formatted =
+        [NSMutableString string];
 
-    for (NSUInteger i = 0; i < allowed.length; i++) {
+    for (NSUInteger i = 0;
+         i < allowed.length;
+         i++) {
 
         if (i > 0 && (i % 4) == 0) {
             [formatted appendString:@"-"];
         }
 
-        [formatted appendFormat:@"%C", [allowed characterAtIndex:i]];
+        [formatted appendFormat:@"%C",
+         [allowed characterAtIndex:i]];
     }
 
     return formatted;
@@ -350,14 +548,18 @@ static UIColor *XFAccent2(void) {
 
 - (void)keyChanged:(UITextField *)field {
 
-    NSString *formatted = [self normalizedKeyFromString:field.text];
+    NSString *formatted =
+        [self formattedKeyFromString:field.text];
 
     field.text = formatted;
 
     if (formatted.length == 19) {
 
-        self.statusLabel.text = @"Key lista para verificar";
-        self.statusLabel.textColor = XFAccent2();
+        self.statusLabel.text =
+            @"✓ Key lista para verificar";
+
+        self.statusLabel.textColor =
+            XFAccent2();
 
     } else {
 
@@ -373,16 +575,15 @@ static UIColor *XFAccent2(void) {
 
 - (void)inspectClipboardSilently {
 
-    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    NSString *clipboard =
+        [UIPasteboard generalPasteboard].string;
 
-    NSString *clipboardString = pasteboard.string;
-
-    if (clipboardString.length == 0) {
+    if (clipboard.length == 0) {
         return;
     }
 
     NSString *formatted =
-        [self normalizedKeyFromString:clipboardString];
+        [self formattedKeyFromString:clipboard];
 
     if (formatted.length == 19) {
 
@@ -391,18 +592,21 @@ static UIColor *XFAccent2(void) {
         self.statusLabel.text =
             @"✓ Key detectada en el portapapeles";
 
-        self.statusLabel.textColor = XFAccent2();
+        self.statusLabel.textColor =
+            XFAccent2();
 
-        self.pasteButton.alpha = 0.7;
+        self.pasteButton.alpha = 0.70;
     }
 }
 
 - (void)pasteKey:(id)sender {
 
-    NSString *clipboardString =
+    [self dismissKeyboard];
+
+    NSString *clipboard =
         [UIPasteboard generalPasteboard].string;
 
-    if (clipboardString.length == 0) {
+    if (clipboard.length == 0) {
 
         self.statusLabel.text =
             @"No hay ninguna Key copiada";
@@ -413,39 +617,42 @@ static UIColor *XFAccent2(void) {
         return;
     }
 
-    NSString *formatted =
-        [self normalizedKeyFromString:clipboardString];
+    self.keyField.text = clipboard;
 
-    if (formatted.length != 19) {
+    [self keyChanged:self.keyField];
+
+    if (self.keyField.text.length == 19) {
 
         self.statusLabel.text =
-            @"La Key del portapapeles no tiene un formato válido";
+            @"✓ Key pegada. Lista para verificar.";
 
         self.statusLabel.textColor =
-            [UIColor systemRedColor];
-
-        return;
+            XFAccent2();
     }
+}
 
-    self.keyField.text = formatted;
+#pragma mark - Text Field
 
-    self.statusLabel.text =
-        @"✓ Key pegada. Lista para verificar.";
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
 
-    self.statusLabel.textColor = XFAccent2();
+    [self dismissKeyboard];
+
+    return YES;
 }
 
 #pragma mark - Verification
 
 - (void)verifyKey:(id)sender {
 
+    [self dismissKeyboard];
+
     NSString *key =
-        [self normalizedKeyFromString:self.keyField.text];
+        [self formattedKeyFromString:self.keyField.text];
 
     if (key.length != 19) {
 
         self.statusLabel.text =
-            @"Key inválida o incompleta.";
+            @"✕ Key inválida o incompleta.";
 
         self.statusLabel.textColor =
             [UIColor systemRedColor];
@@ -459,33 +666,38 @@ static UIColor *XFAccent2(void) {
     self.spinner.hidden = NO;
     [self.spinner startAnimating];
 
-    self.statusLabel.text = @"Verificando Key…";
-    self.statusLabel.textColor = XFAccent2();
+    self.statusLabel.text =
+        @"Verificando Key…";
+
+    self.statusLabel.textColor =
+        XFAccent2();
 
     /*
-     FUTURO BACKEND XITFORGE
+     PUNTO DE INTEGRACIÓN DEL BACKEND XITFORGE
 
-     Aquí conectarás la validación real contra tu servidor.
-
-     Ejemplo conceptual:
+     Aquí debe ir posteriormente la petición HTTPS:
 
         POST /api/keys/validate
+
+     Body:
+
         {
-            "key": key
+            "key": "XXXX-XXXX-XXXX-XXXX"
         }
 
-     Respuesta:
+     El servidor debe responder algo equivalente a:
 
         {
             "valid": true
         }
 
-     Solo cuando valid == true se debe llamar a openMainApp.
+     Solo si el servidor responde valid=true
+     se debe llamar a openMainApp.
     */
 
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW,
-                     (int64_t)(0.45 * NSEC_PER_SEC)),
+                      (int64_t)(0.45 * NSEC_PER_SEC)),
         dispatch_get_main_queue(),
         ^{
 
@@ -495,7 +707,13 @@ static UIColor *XFAccent2(void) {
             self.continueButton.enabled = YES;
             self.pasteButton.enabled = YES;
 
-            // PRUEBA LOCAL
+            /*
+             PRUEBA LOCAL.
+
+             Esto NO es todavía la validación
+             multiusuario real.
+            */
+
             self.statusLabel.text =
                 @"✓ Key aceptada. Entrando a XITFORGE…";
 
